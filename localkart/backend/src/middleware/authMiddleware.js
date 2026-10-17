@@ -22,6 +22,9 @@ export async function authenticateToken(req, res, next) {
     if (!user) {
       return res.status(401).json({ message: 'Authentication failed.' });
     }
+    if (user.status === 'Suspended') {
+      return res.status(403).json({ message: 'This account is suspended.' });
+    }
 
     req.user = user;
     return next();
