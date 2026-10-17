@@ -1,8 +1,8 @@
 import {Routes,Route,Navigate,Outlet,NavLink,Link,useNavigate} from 'react-router-dom';import {useState} from 'react';import {useApp} from './store.jsx';import {localities} from './data/mock.js';
 import {Home,Products,ProductDetails,Vendors,VendorPage} from './pages/Shop.jsx';import {Login,Register} from './pages/Auth.jsx';import {Cart,Checkout,OrderSuccess,Orders,OrderTracking,Profile} from './pages/Buy.jsx';
 import {VDash,VProducts,VOrders,VInventory,VStore} from './pages/Vendor.jsx';import {ADash,AUsers,AVendors,AProducts,AOrders,AComplaints} from './pages/Admin.jsx';
-const Guard=({role})=>{const {s}=useApp();if(!s.user)return <Navigate to="/login"/>;if(s.user.role!==role)return <div className="card center wrap"><h2>Unauthorized Access</h2><p>Your account cannot open this page.</p><Link className="btn" to="/">Go home</Link></div>;return <Outlet/>};
-function Customer(){const {s,set,t}=useApp();const nav=useNavigate();const [o,O]=useState(false);const n=s.cart.reduce((a,c)=>a+c.qty,0);const [q,Q]=useState('');
+const Guard=({role})=>{const {s}=useApp();if(!s.authReady)return <main className="wrap"><div className="card center">Restoring your session…</div></main>;if(!s.user)return <Navigate to="/login" replace/>;if(s.user.role!==role)return <div className="card center wrap"><h2>Unauthorized Access</h2><p>Your account cannot open this page.</p><Link className="btn" to="/">Go home</Link></div>;return <Outlet/>};
+function Customer(){const {s,set,t,logout}=useApp();const nav=useNavigate();const [o,O]=useState(false);const n=s.cart.reduce((a,c)=>a+c.qty,0);const [q,Q]=useState('');
  return <><header className="nav"><Link to="/" className="logo">LocalKart<small>Fresh. Local. Trusted.</small></Link>
  <button className="btn ghost menu" aria-label="Menu" onClick={()=>O(!o)}>Menu</button>
  <div className={'navc '+(o?'open':'')} onClick={()=>O(false)}>
@@ -12,12 +12,12 @@ function Customer(){const {s,set,t}=useApp();const nav=useNavigate();const [o,O]
  {s.user?.role==='customer'&&<><NavLink to="/orders">Orders</NavLink><NavLink to="/profile">Profile</NavLink></>}
  {s.user?.role==='vendor'&&<NavLink to="/vendor/dashboard">Dashboard</NavLink>}{s.user?.role==='admin'&&<NavLink to="/admin/dashboard">Dashboard</NavLink>}
  <NavLink to="/cart">Cart ({n})</NavLink>
- {s.user?<button className="btn ghost" onClick={()=>{set('user',null);t('Logged out');nav('/')}}>Logout</button>:<><Link className="btn ghost" to="/login">Login</Link><Link className="btn" to="/register">Register</Link></>}
+ {s.user?<button className="btn ghost" onClick={()=>{logout();t('Logged out');nav('/')}}>Logout</button>:<><Link className="btn ghost" to="/login">Login</Link><Link className="btn" to="/register">Register</Link></>}
  </div></header><main className="wrap"><Outlet/></main>
  <footer className="foot"><b>LocalKart</b> - Fresh. Local. Trusted. Connecting local vendors with nearby customers.</footer></>}
-function Side({links,title}){const {set,t,s}=useApp();const nav=useNavigate();const [o,O]=useState(false);
+function Side({links,title}){const {t,s,logout}=useApp();const nav=useNavigate();const [o,O]=useState(false);
  return <div className="shell"><aside className={'side '+(o?'open':'')} onClick={()=>O(false)}><div className="logo">LocalKart<small>{title}</small></div>
- {links.map(([to,l])=><NavLink key={to} to={to}>{l}</NavLink>)}<button className="btn ghost" onClick={()=>{set('user',null);t('Logged out');nav('/login')}}>Logout</button></aside>
+ {links.map(([to,l])=><NavLink key={to} to={to}>{l}</NavLink>)}<button className="btn ghost" onClick={()=>{logout();t('Logged out');nav('/login')}}>Logout</button></aside>
  <section className="dash"><button className="btn ghost menu" onClick={()=>O(!o)}>Menu</button><p className="muted">Signed in as {s.user?.name}</p><Outlet/></section></div>}
 const VL=[['/vendor/dashboard','Dashboard'],['/vendor/products','Products'],['/vendor/orders','Orders'],['/vendor/inventory','Inventory'],['/vendor/store','Store Profile']];
 const AL=[['/admin/dashboard','Dashboard'],['/admin/users','Users'],['/admin/vendors','Vendor Verification'],['/admin/products','Products'],['/admin/orders','Orders'],['/admin/complaints','Complaints']];

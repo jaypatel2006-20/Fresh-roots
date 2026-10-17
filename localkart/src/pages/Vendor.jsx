@@ -1,29 +1,97 @@
-import {useState} from 'react';import {useApp} from '../store.jsx';import {categories} from '../data/mock.js';import {Badge,Modal,Confirm,Empty,m} from '../ui.jsx';
-const useV=()=>{const {s}=useApp();const vid=s.user.vendorId;return {vid,v:s.vendors.find(v=>v.id===vid),ps:s.products.filter(p=>p.vendorId===vid),os:s.orders.filter(o=>o.vendorId===vid)}};
-const Stat=({l,v})=><div className="card"><p className="muted small">{l}</p><h2>{v}</h2></div>;
-export const Bars=({data})=>{const mx=Math.max(1,...data.map(d=>d[1]));return <div className="bars" role="img" aria-label="Bar chart">{data.map(([l,n])=><div key={l}><i style={{height:(n/mx*100)+'%'}}/><span>{l}</span><b>{n}</b></div>)}</div>};
-export function VDash(){const {s}=useApp();const {ps,os}=useV();const ok=os.filter(o=>o.status==='Delivered');const low=ps.filter(p=>p.stock<=p.min);
- const top=ps.map(p=>[p.name,os.reduce((a,o)=>a+o.items.filter(i=>i.pid===p.id).reduce((x,i)=>x+i.qty,0),0)]).sort((a,b)=>b[1]-a[1]).slice(0,5);
- const byDate={};ok.forEach(o=>byDate[o.date.slice(5)]=(byDate[o.date.slice(5)]||0)+o.total);
- return <><h1>Dashboard</h1><div className="grid sm"><Stat l="Total sales" v={m(ok.reduce((a,o)=>a+o.total,0))}/><Stat l="Orders" v={os.length}/><Stat l="Products" v={ps.length}/><Stat l="Pending orders" v={os.filter(o=>o.status==='Placed').length}/><Stat l="Low stock" v={low.length}/></div>
- <div className="grid"><div className="card"><h3>Sales over time</h3>{Object.keys(byDate).length?<Bars data={Object.entries(byDate)}/>:<p className="muted">No delivered orders yet.</p>}</div><div className="card"><h3>Orders by status</h3><Bars data={['Placed','Preparing','Delivered','Cancelled'].map(x=>[x.slice(0,6),os.filter(o=>o.status===x).length])}/></div></div>
- <div className="grid"><div className="card"><h3>Top-selling products</h3>{top.map(t=><p key={t[0]}>{t[0]}: {t[1]} sold</p>)}</div><div className="card"><h3>Low-stock alerts</h3>{low.length?low.map(p=><p key={p.id}>{p.name}: {p.stock} left</p>):<p className="muted">All stocked.</p>}</div></div>
- <div className="card"><h3>Recent orders</h3>{os.slice(0,5).map(o=><p key={o.id}>{o.id} - {m(o.total)} <Badge s={o.status}/></p>)}</div></>}
-export function VProducts(){const {s,set,t}=useApp();const {vid,ps}=useV();const [ed,Ed]=useState(null);const [del,Del]=useState(null);
- const save=e=>{e.preventDefault();const f=ed;if(f.price<=0||f.stock<0)return t('Enter a valid price and stock');f.id?set('products',x=>x.map(p=>p.id===f.id?f:p)):set('products',x=>[...x,{...f,id:Date.now(),vendorId:vid,rating:0,approved:true}]);t(f.id?'Product updated':'Product added');Ed(null)};
- const u=k=>e=>Ed({...ed,[k]:e.target.type==='number'?+e.target.value:e.target.value});
- return <><div className="row between"><h1>Products</h1><button className="btn" onClick={()=>Ed({name:'',category:categories[0],desc:'',price:0,unit:'kg',stock:0,min:10,active:true})}>Add product</button></div>
- {ps.length?<div className="tw"><table><thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Stock</th><th>Status</th><th>Actions</th></tr></thead><tbody>{ps.map(p=><tr key={p.id}><td>{p.name}</td><td>{p.category}</td><td>{m(p.price)}/{p.unit}</td><td>{p.stock}</td><td><Badge s={p.active?'Active':'Disabled'}/></td>
- <td className="row"><button className="btn ghost" onClick={()=>Ed(p)}>Edit</button><button className="btn ghost" onClick={()=>set('products',x=>x.map(y=>y.id===p.id?{...y,active:!y.active}:y))}>{p.active?'Disable':'Enable'}</button><button className="btn ghost" onClick={()=>Del(p)}>Delete</button></td></tr>)}</tbody></table></div>:<Empty t="No products yet"/>}
- {ed&&<Modal title={ed.id?'Edit product':'Add product'} onClose={()=>Ed(null)}><form className="form" onSubmit={save}><label>Name<input required value={ed.name} onChange={u('name')}/></label><label>Category<select value={ed.category} onChange={u('category')}>{categories.map(c=><option key={c}>{c}</option>)}</select></label><label>Description<textarea value={ed.desc} onChange={u('desc')}/></label>
- <label>Price<input type="number" min="1" required value={ed.price} onChange={u('price')}/></label><label>Unit<input required value={ed.unit} onChange={u('unit')}/></label><label>Stock<input type="number" min="0" required value={ed.stock} onChange={u('stock')}/></label><label>Image<input type="file"/></label><label className="chk"><input type="checkbox" checked={ed.active} onChange={e=>Ed({...ed,active:e.target.checked})}/> Available</label><button className="btn">Save product</button></form></Modal>}
- {del&&<Confirm msg={'Delete '+del.name+'?'} onClose={()=>Del(null)} onYes={()=>{set('products',x=>x.filter(p=>p.id!==del.id));t('Product deleted successfully')}}/>}</>}
-const nx={Placed:'Confirmed',Confirmed:'Preparing',Preparing:'Out for Delivery','Out for Delivery':'Delivered'};
-export function VOrders(){const {s,set,t}=useApp();const {os}=useV();const go=(o,st)=>{set('orders',x=>x.map(y=>y.id===o.id?{...y,status:st}:y));t('Order '+o.id+' marked '+st)};
- return <><h1>Orders</h1>{os.length?<div className="tw"><table><thead><tr><th>Order</th><th>Customer</th><th>Products</th><th>Amount</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead><tbody>{os.map(o=><tr key={o.id}><td>{o.id}</td><td>{s.users.find(u=>u.id===o.customerId)?.name}</td><td>{o.items.map(i=>i.name+' x '+i.qty).join(', ')}</td><td>{m(o.total)}</td><td>{o.date}</td><td><Badge s={o.status}/></td>
- <td className="row">{nx[o.status]&&<button className="btn" onClick={()=>go(o,nx[o.status])}>{o.status==='Placed'?'Accept':'Mark '+nx[o.status]}</button>}{o.status==='Placed'&&<button className="btn ghost" onClick={()=>go(o,'Rejected')}>Reject</button>}</td></tr>)}</tbody></table></div>:<Empty t="No orders yet"/>}</>}
-export function VInventory(){const {set,t}=useApp();const {ps}=useV();
- return <><h1>Inventory</h1><div className="tw"><table><thead><tr><th>Product</th><th>Current stock</th><th>Minimum</th><th>Status</th><th>Update</th></tr></thead><tbody>{ps.map(p=><tr key={p.id}><td>{p.name}</td><td><input aria-label="Stock" type="number" min="0" value={p.stock} onChange={e=>set('products',x=>x.map(y=>y.id===p.id?{...y,stock:Math.max(0,+e.target.value)}:y))}/></td><td>{p.min}</td><td><Badge s={p.stock===0?'Rejected':p.stock<=p.min?'Pending':'Verified'}/> {p.stock===0?'Out of Stock':p.stock<=p.min?'Low Stock':'In Stock'}</td><td><button className="btn ghost" onClick={()=>t('Stock saved')}>Save</button></td></tr>)}</tbody></table></div></>}
-export function VStore(){const {set,t}=useApp();const {v}=useV();const [f,F]=useState(v);const u=k=>e=>F({...f,[k]:e.target.value});
- return <><h1>Store profile</h1><p>Verification: <Badge s={v.status}/></p><form className="card form" onSubmit={e=>{e.preventDefault();set('vendors',x=>x.map(y=>y.id===f.id?f:y));t('Store updated')}}><label>Business name<input required value={f.name} onChange={u('name')}/></label><label>Description<textarea value={f.desc} onChange={u('desc')}/></label><label>Address<input value={f.address} onChange={u('address')}/></label>
- <label>Contact<input value={f.phone} onChange={u('phone')}/></label><label>Category<select value={f.cat} onChange={u('cat')}>{categories.map(c=><option key={c}>{c}</option>)}</select></label><label>Delivery radius (km)<input type="number" min="1" value={f.radius} onChange={u('radius')}/></label><label>Opening hours<input value={f.hours} onChange={u('hours')}/></label><label>Logo and cover<input type="file"/></label><button className="btn">Save changes</button></form></>}
+import { useEffect, useState } from 'react';
+import { useApp } from '../store.jsx';
+import { categories } from '../data/mock.js';
+import { Badge, Modal, Confirm, Empty, m } from '../ui.jsx';
+import { api, asOrder, asProduct } from '../api/api.js';
+
+function useVendorData() {
+  const { s } = useApp(); const [products, setProducts] = useState([]); const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true); const [error, setError] = useState('');
+  const refresh = async () => {
+    setLoading(true); setError('');
+    try {
+      const [productResult, orderResult] = await Promise.all([api('/products/mine'), api('/orders/vendor-orders')]);
+      setProducts((productResult.products || []).map(asProduct));
+      setOrders((orderResult.orders || []).map(asOrder));
+    } catch (err) { setError(err.message); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { refresh(); }, [s.user?.id]);
+  return { products, orders, setProducts, setOrders, loading, error, refresh };
+}
+
+const Stat = ({ label, value }) => <div className="card"><p className="muted small">{label}</p><h2>{value}</h2></div>;
+export const Bars = ({ data }) => { const max = Math.max(1, ...data.map((item) => item[1])); return <div className="bars" role="img" aria-label="Bar chart">{data.map(([label, value]) => <div key={label}><i style={{ height: `${value / max * 100}%` }}/><span>{label}</span><b>{value}</b></div>)}</div>; };
+
+function VendorLoad({ data }) { return data.loading ? <p className="muted">Loading your vendor data…</p> : data.error ? <p className="err" role="alert">{data.error}</p> : null; }
+
+export function VDash() {
+  const data = useVendorData(); const { products, orders } = data;
+  const delivered = orders.filter((order) => order.status === 'Delivered'); const low = products.filter((product) => product.stock <= product.min);
+  const top = products.map((product) => [product.name, orders.reduce((sum, order) => sum + order.items.filter((item) => String(item.pid) === product.id).reduce((qty, item) => qty + item.qty, 0), 0)]).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const byDate = {}; delivered.forEach((order) => { const date = new Date(order.date).toLocaleDateString(); byDate[date] = (byDate[date] || 0) + order.total; });
+  return <><h1>Dashboard</h1><VendorLoad data={data}/>{!data.loading && !data.error && <><div className="grid sm"><Stat label="Total sales" value={m(delivered.reduce((sum, order) => sum + order.total, 0))}/><Stat label="Orders" value={orders.length}/><Stat label="Products" value={products.length}/><Stat label="Pending orders" value={orders.filter((order) => order.status === 'Placed').length}/><Stat label="Low stock" value={low.length}/></div>
+    <div className="grid"><div className="card"><h3>Sales over time</h3>{Object.keys(byDate).length ? <Bars data={Object.entries(byDate)}/> : <p className="muted">No delivered orders yet.</p>}</div><div className="card"><h3>Orders by status</h3><Bars data={['Placed', 'Confirmed', 'Preparing', 'Out for Delivery', 'Delivered'].map((status) => [status, orders.filter((order) => order.status === status).length])}/></div></div>
+    <div className="grid"><div className="card"><h3>Top-selling products</h3>{top.length ? top.map(([name, qty]) => <p key={name}>{name}: {qty} sold</p>) : <p className="muted">No product sales yet.</p>}</div><div className="card"><h3>Low-stock alerts</h3>{low.length ? low.map((product) => <p key={product.id}>{product.name}: {product.stock} left</p>) : <p className="muted">All stocked.</p>}</div></div>
+    <div className="card"><h3>Recent orders</h3>{orders.slice(0, 5).length ? orders.slice(0, 5).map((order) => <p key={order.id}>{order.id} - {m(order.total)} <Badge s={order.status}/></p>) : <p className="muted">No orders yet.</p>}</div></>}</>;
+}
+
+export function VProducts() {
+  const data = useVendorData(); const { products, setProducts, refresh } = data; const { t } = useApp();
+  const [editing, setEditing] = useState(null); const [deleting, setDeleting] = useState(null); const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
+  const updateField = (key) => (event) => setEditing((current) => ({ ...current, [key]: event.target.type === 'number' ? Number(event.target.value) : event.target.value }));
+  const save = async (event) => {
+    event.preventDefault(); setError(''); setBusy(true);
+    const body = { name: editing.name, category: editing.category, desc: editing.desc, price: Number(editing.price), unit: editing.unit, stock: Number(editing.stock), min: Number(editing.min), ...(editing.id ? { active: editing.active } : {}) };
+    try {
+      const result = editing.id
+        ? await api(`/products/${editing.id}`, { method: 'PUT', body })
+        : await api('/products', { method: 'POST', body });
+      const product = asProduct(result.product);
+      setProducts((current) => editing.id ? current.map((item) => item.id === product.id ? product : item) : [product, ...current]);
+      t(editing.id ? 'Product updated.' : 'Product submitted for approval.'); setEditing(null);
+    } catch (err) { setError(err.message); }
+    finally { setBusy(false); }
+  };
+  const toggle = async (product) => {
+    try { const { product: updated } = await api(`/products/${product.id}`, { method: 'PUT', body: { active: !product.active } }); setProducts((items) => items.map((item) => item.id === product.id ? asProduct(updated) : item)); }
+    catch (err) { setError(err.message); }
+  };
+  const remove = async () => {
+    try { await api(`/products/${deleting.id}`, { method: 'DELETE' }); setProducts((items) => items.filter((item) => item.id !== deleting.id)); t('Product deleted.'); }
+    catch (err) { setError(err.message); }
+    finally { setDeleting(null); }
+  };
+  return <><div className="row between"><h1>Products</h1><button className="btn" onClick={() => setEditing({ name: '', category: categories[0], desc: '', price: 1, unit: 'kg', stock: 0, min: 10, active: true })}>Add product</button></div>
+    <VendorLoad data={data}/>{error && <p className="err" role="alert">{error}</p>}{!data.loading && !data.error && (products.length ? <div className="tw"><table><thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Stock</th><th>Status</th><th>Actions</th></tr></thead><tbody>{products.map((product) => <tr key={product.id}><td>{product.name}</td><td>{product.category}</td><td>{m(product.price)}/{product.unit}</td><td>{product.stock}</td><td><Badge s={!product.approved ? 'Pending' : product.active ? 'Active' : 'Disabled'}/></td><td className="row"><button className="btn ghost" onClick={() => setEditing({ ...product })}>Edit</button><button className="btn ghost" onClick={() => toggle(product)}>{product.active ? 'Disable' : 'Enable'}</button><button className="btn ghost" onClick={() => setDeleting(product)}>Delete</button></td></tr>)}</tbody></table></div> : <Empty t="No products yet">Add a product to submit it for approval.</Empty>)}
+    {editing && <Modal title={editing.id ? 'Edit product' : 'Add product'} onClose={() => setEditing(null)}><form className="form" onSubmit={save}><label>Name<input required value={editing.name} onChange={updateField('name')}/></label><label>Category<select value={editing.category} onChange={updateField('category')}>{categories.map((category) => <option key={category}>{category}</option>)}</select></label><label>Description<textarea value={editing.desc || ''} onChange={updateField('desc')}/></label><label>Price<input type="number" min="0.01" step="0.01" required value={editing.price} onChange={updateField('price')}/></label><label>Unit<input required value={editing.unit} onChange={updateField('unit')}/></label><label>Stock<input type="number" min="0" required value={editing.stock} onChange={updateField('stock')}/></label><label>Minimum stock<input type="number" min="0" value={editing.min} onChange={updateField('min')}/></label>{editing.id && <label className="chk"><input type="checkbox" checked={editing.active} onChange={(event) => setEditing({ ...editing, active: event.target.checked })}/> Available</label>}<button className="btn" disabled={busy}>{busy ? 'Saving…' : 'Save product'}</button></form></Modal>}
+    {deleting && <Confirm msg={`Delete ${deleting.name}?`} onClose={() => setDeleting(null)} onYes={remove}/>}
+  </>;
+}
+
+const nextStatus = { Placed: 'Confirmed', Confirmed: 'Preparing', Preparing: 'Out for Delivery', 'Out for Delivery': 'Delivered' };
+export function VOrders() {
+  const data = useVendorData(); const { orders, setOrders } = data; const [error, setError] = useState('');
+  const advance = async (order, status) => {
+    setError('');
+    try { const { order: updated } = await api(`/orders/${order.id}/status`, { method: 'PATCH', body: { status } }); setOrders((current) => current.map((item) => item.id === order.id ? asOrder(updated) : item)); }
+    catch (err) { setError(err.message); }
+  };
+  return <><h1>Orders</h1><VendorLoad data={data}/>{error && <p className="err" role="alert">{error}</p>}{!data.loading && !data.error && (orders.length ? <div className="tw"><table><thead><tr><th>Order</th><th>Customer</th><th>Products</th><th>Amount</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead><tbody>{orders.map((order) => <tr key={order.id}><td>{order.id}</td><td>{order.customerId?.name || 'Customer'}</td><td>{order.items.map((item) => `${item.name} × ${item.qty}`).join(', ')}</td><td>{m(order.total)}</td><td>{new Date(order.date).toLocaleDateString()}</td><td><Badge s={order.status}/></td><td>{nextStatus[order.status] && <button className="btn" onClick={() => advance(order, nextStatus[order.status])}>{order.status === 'Placed' ? 'Accept' : `Mark ${nextStatus[order.status]}`}</button>}</td></tr>)}</tbody></table></div> : <Empty t="No orders yet"/>)}
+  </>;
+}
+
+export function VInventory() {
+  const data = useVendorData(); const { products, setProducts } = data; const [stock, setStock] = useState({}); const [error, setError] = useState(''); const [saved, setSaved] = useState('');
+  const save = async (product) => {
+    setError(''); setSaved('');
+    try { const { product: updated } = await api(`/products/${product.id}`, { method: 'PUT', body: { stock: Number(stock[product.id] ?? product.stock) } }); setProducts((items) => items.map((item) => item.id === product.id ? asProduct(updated) : item)); setSaved(`${product.name} stock saved.`); }
+    catch (err) { setError(err.message); }
+  };
+  return <><h1>Inventory</h1><VendorLoad data={data}/>{error && <p className="err" role="alert">{error}</p>}{saved && <p role="status">{saved}</p>}{!data.loading && !data.error && (products.length ? <div className="tw"><table><thead><tr><th>Product</th><th>Current stock</th><th>Minimum</th><th>Status</th><th>Update</th></tr></thead><tbody>{products.map((product) => { const current = Number(stock[product.id] ?? product.stock); return <tr key={product.id}><td>{product.name}</td><td><input aria-label={`Stock for ${product.name}`} type="number" min="0" value={current} onChange={(event) => setStock((items) => ({ ...items, [product.id]: event.target.value }))}/></td><td>{product.min}</td><td><Badge s={current === 0 ? 'Out of Stock' : current <= product.min ? 'Low Stock' : 'In Stock'}/></td><td><button className="btn ghost" onClick={() => save(product)}>Save</button></td></tr>; })}</tbody></table></div> : <Empty t="No inventory yet"/>)}
+  </>;
+}
+
+export function VStore() {
+  return <><h1>Store profile</h1><div className="card"><p>Store details are collected during registration.</p><p className="muted small">The current backend has no private vendor-profile read or update endpoint. Product and order management remain available through their existing APIs.</p></div></>;
+}
