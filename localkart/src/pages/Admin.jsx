@@ -1,26 +1,122 @@
-import {useState} from 'react';import {useApp} from '../store.jsx';import {Badge,Confirm,Empty,m} from '../ui.jsx';import {Bars} from './Vendor.jsx';
-const Stat=({l,v})=><div className="card"><p className="muted small">{l}</p><h2>{v}</h2></div>;
-const Tbl=({h,children})=><div className="tw"><table><thead><tr>{h.map(x=><th key={x}>{x}</th>)}</tr></thead><tbody>{children}</tbody></table></div>;
-export function ADash(){const {s}=useApp();const vs=s.vendors;const cnt=x=>vs.filter(v=>v.status===x).length;
- return <><h1>Dashboard</h1><div className="grid sm"><Stat l="Total users" v={s.users.length}/><Stat l="Total vendors" v={vs.length}/><Stat l="Verified vendors" v={cnt('Verified')}/><Stat l="Pending verification" v={cnt('Pending')}/><Stat l="Total orders" v={s.orders.length}/><Stat l="Total revenue" v={m(s.orders.filter(o=>o.status==='Delivered').reduce((a,o)=>a+o.total,0))}/></div>
- <div className="grid"><div className="card"><h3>User growth (by month joined)</h3><Bars data={['2024-12','2025-01','2025-02','2025-03'].map(k=>[k.slice(2),s.users.filter(u=>u.joined.startsWith(k)).length])}/></div><div className="card"><h3>Order statistics</h3><Bars data={['Placed','Confirmed','Preparing','Delivered','Cancelled'].map(x=>[x.slice(0,5),s.orders.filter(o=>o.status===x).length])}/></div>
- <div className="card"><h3>Vendor verification</h3><Bars data={['Verified','Pending','Rejected','Suspended'].map(x=>[x.slice(0,5),cnt(x)])}/></div></div>
- <div className="card"><h3>Recent activity</h3>{s.orders.slice(0,5).map(o=><p key={o.id}>Order {o.id} - {o.status} - {m(o.total)}</p>)}</div></>}
-export function AUsers(){const {s,set,t}=useApp();const [c,C]=useState(null);const us=s.users.filter(u=>u.role==='customer');
- return <><h1>Users</h1><Tbl h={['ID','Name','Email','Locality','Joined','Status','Actions']}>{us.map(u=><tr key={u.id}><td>{u.id}</td><td>{u.name}</td><td>{u.email}</td><td>{u.locality}</td><td>{u.joined}</td><td><Badge s={u.status}/></td><td className="row"><button className="btn ghost" onClick={()=>t(u.name+': '+s.orders.filter(o=>o.customerId===u.id).length+' orders, phone '+u.phone)}>View</button><button className="btn ghost" onClick={()=>C(u)}>{u.status==='Active'?'Suspend':'Activate'}</button></td></tr>)}</Tbl>
- {c&&<Confirm msg={(c.status==='Active'?'Suspend ':'Activate ')+c.name+'?'} onClose={()=>C(null)} onYes={()=>{set('users',x=>x.map(y=>y.id===c.id?{...y,status:c.status==='Active'?'Suspended':'Active'}:y));t('User status updated')}}/>}</>}
-export function AVendors(){const {s,set,t}=useApp();const [c,C]=useState(null);
- return <><h1>Vendor verification</h1><Tbl h={['Business','Locality','Category','Submitted','Status','Actions']}>{s.vendors.map(v=><tr key={v.id}><td>{v.name}</td><td>{v.locality}</td><td>{v.cat}</td><td>{v.submitted}</td><td><Badge s={v.status}/></td><td className="row"><button className="btn ghost" onClick={()=>t(v.name+': '+v.address+', '+v.phone)}>Details</button>
- {v.status!=='Verified'&&<button className="btn" onClick={()=>C([v,'Verified'])}>Approve</button>}{v.status==='Pending'&&<button className="btn ghost" onClick={()=>C([v,'Rejected'])}>Reject</button>}{v.status==='Verified'&&<button className="btn ghost" onClick={()=>C([v,'Suspended'])}>Suspend</button>}</td></tr>)}</Tbl>
- {c&&<Confirm msg={'Mark '+c[0].name+' as '+c[1]+'?'} onClose={()=>C(null)} onYes={()=>{set('vendors',x=>x.map(y=>y.id===c[0].id?{...y,status:c[1]}:y));t(c[1]==='Verified'?'Vendor verified successfully':'Vendor '+c[1].toLowerCase())}}/>}</>}
-export function AProducts(){const {s,set,t}=useApp();const [d,D]=useState(null);const up=(p,ch,msg)=>{set('products',x=>x.map(y=>y.id===p.id?{...y,...ch}:y));t(msg)};
- return <><h1>Products</h1><Tbl h={['Product','Vendor','Category','Price','Stock','Status','Actions']}>{s.products.map(p=><tr key={p.id}><td>{p.name}</td><td>{s.vendors.find(v=>v.id===p.vendorId)?.name}</td><td>{p.category}</td><td>{m(p.price)}</td><td>{p.stock}</td><td><Badge s={!p.approved?'Pending':p.active?'Active':'Disabled'}/></td><td className="row">{!p.approved&&<button className="btn" onClick={()=>up(p,{approved:true},'Product approved')}>Approve</button>}<button className="btn ghost" onClick={()=>up(p,{active:!p.active},p.active?'Product disabled':'Product enabled')}>{p.active?'Disable':'Enable'}</button><button className="btn ghost" onClick={()=>D(p)}>Remove</button></td></tr>)}</Tbl>
- {d&&<Confirm msg={'Remove '+d.name+'?'} onClose={()=>D(null)} onYes={()=>{set('products',x=>x.filter(y=>y.id!==d.id));t('Product removed')}}/>}</>}
-export function AOrders(){const {s}=useApp();const [f,F]=useState({st:'',v:'',c:'',d:''});const u=k=>e=>F({...f,[k]:e.target.value});
- const l=s.orders.filter(o=>(!f.st||o.status===f.st)&&(!f.v||o.vendorId==f.v)&&(!f.c||o.customerId===f.c)&&(!f.d||o.date===f.d));
- return <><h1>Orders</h1><div className="card filters"><input type="date" aria-label="Date" onChange={u('d')}/><select aria-label="Vendor" onChange={u('v')}><option value="">All vendors</option>{s.vendors.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}</select><select aria-label="Customer" onChange={u('c')}><option value="">All customers</option>{s.users.filter(x=>x.role==='customer').map(v=><option key={v.id} value={v.id}>{v.name}</option>)}</select>
- <select aria-label="Status" onChange={u('st')}><option value="">All statuses</option>{['Placed','Confirmed','Preparing','Out for Delivery','Delivered','Cancelled','Rejected'].map(x=><option key={x}>{x}</option>)}</select></div>
- {l.length?<Tbl h={['Order','Customer','Vendor','Amount','Date','Status']}>{l.map(o=><tr key={o.id}><td>{o.id}</td><td>{s.users.find(u=>u.id===o.customerId)?.name}</td><td>{s.vendors.find(v=>v.id===o.vendorId)?.name}</td><td>{m(o.total)}</td><td>{o.date}</td><td><Badge s={o.status}/></td></tr>)}</Tbl>:<Empty t="No matching orders"/>}</>}
-export function AComplaints(){const {s,set,t}=useApp();
- return <><h1>Complaints</h1><Tbl h={['ID','User','Vendor','Issue','Date','Priority','Status','Actions']}>{s.complaints.map(c=><tr key={c.id}><td>{c.id}</td><td>{s.users.find(u=>u.id===c.uid)?.name}</td><td>{s.vendors.find(v=>v.id===c.vendorId)?.name}</td><td>{c.issue}</td><td>{c.date}</td><td><Badge s={c.priority}/></td><td><Badge s={c.status}/></td>
- <td className="row"><button className="btn ghost" onClick={()=>t(c.issue+' - '+c.priority+' priority')}>View</button><button className="btn" onClick={()=>{set('complaints',x=>x.map(y=>y.id===c.id?{...y,status:'Resolved'}:y));t('Complaint resolved')}}>Resolve</button><button className="btn ghost" onClick={()=>set('complaints',x=>x.map(y=>y.id===c.id?{...y,status:'Pending'}:y))}>Mark pending</button></td></tr>)}</Tbl></>}
+import { useEffect, useState } from 'react';
+import { useApp } from '../store.jsx';
+import { Badge, Confirm, Empty, m } from '../ui.jsx';
+import { Bars } from './Vendor.jsx';
+import { api, asProduct, asVendor } from '../api/api.js';
+
+function useAdminResource(path, query = '') {
+  const [data, setData] = useState(null); const [loading, setLoading] = useState(true); const [error, setError] = useState('');
+  const load = async () => {
+    setLoading(true); setError('');
+    try { setData(await api(`${path}${query ? `?${query}` : ''}`)); }
+    catch (err) { setError(err.message); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, [path, query]);
+  return { data, setData, loading, error, refresh: load };
+}
+
+const Stat = ({ label, value }) => <div className="card"><p className="muted small">{label}</p><h2>{value}</h2></div>;
+const Table = ({ headings, children }) => <div className="tw"><table><thead><tr>{headings.map((heading) => <th key={heading}>{heading}</th>)}</tr></thead><tbody>{children}</tbody></table></div>;
+const dateText = (value) => value ? new Date(value).toLocaleDateString() : '—';
+
+export function ADash() {
+  const result = useAdminResource('/admin/dashboard'); const data = result.data; const stats = data?.stats;
+  return <><h1>Dashboard</h1>{result.loading ? <p className="muted">Loading dashboard…</p> : result.error ? <p className="err" role="alert">{result.error}</p> : stats && <>
+    <div className="grid sm"><Stat label="Total users" value={stats.totalUsers}/><Stat label="Total vendors" value={stats.totalVendors}/><Stat label="Verified vendors" value={stats.verifiedVendors}/><Stat label="Pending verification" value={stats.pendingVendors}/><Stat label="Total products" value={stats.totalProducts}/><Stat label="Pending approval" value={stats.pendingProducts}/><Stat label="Total orders" value={stats.totalOrders}/><Stat label="Active orders" value={stats.activeOrders}/><Stat label="Unresolved complaints" value={stats.unresolvedComplaints}/><Stat label="Delivered revenue" value={m(stats.totalRevenue)}/></div>
+    <div className="grid"><div className="card"><h3>User growth (by month joined)</h3>{data.userGrowth.length ? <Bars data={data.userGrowth.map((item) => [item.month, item.count])}/> : <p className="muted">No user records yet.</p>}</div><div className="card"><h3>Order statistics</h3>{data.ordersByStatus.length ? <Bars data={data.ordersByStatus.map((item) => [item.status, item.count])}/> : <p className="muted">No order records yet.</p>}</div><div className="card"><h3>Vendor verification</h3>{data.vendorsByStatus.length ? <Bars data={data.vendorsByStatus.map((item) => [item.status, item.count])}/> : <p className="muted">No vendor records yet.</p>}</div></div>
+  </>}</>;
+}
+
+export function AUsers() {
+  const { s, t } = useApp(); const [filters, setFilters] = useState({ q: '', role: 'customer', status: '' }); const [pending, setPending] = useState(null); const [error, setError] = useState('');
+  const query = new URLSearchParams(Object.entries(filters).filter(([, value]) => value)).toString();
+  const result = useAdminResource('/admin/users', query); const users = result.data?.users || [];
+  const updateFilter = (key) => (event) => setFilters((current) => ({ ...current, [key]: event.target.value }));
+  const changeStatus = async () => {
+    setError('');
+    try {
+      const status = pending.status === 'Active' ? 'Suspended' : 'Active';
+      await api(`/admin/users/${pending.id}/status`, { method: 'PATCH', body: { status } });
+      await result.refresh();
+      t(`User ${status.toLowerCase()}.`);
+    } catch (err) { setError(err.message); }
+    finally { setPending(null); }
+  };
+  return <><h1>Users</h1><div className="card filters"><input aria-label="Search users" placeholder="Search name or email" value={filters.q} onChange={updateFilter('q')}/><select aria-label="Role" value={filters.role} onChange={updateFilter('role')}><option value="">All roles</option><option value="customer">Customer</option><option value="vendor">Vendor</option><option value="admin">Admin</option></select><select aria-label="Status" value={filters.status} onChange={updateFilter('status')}><option value="">All statuses</option><option value="Active">Active</option><option value="Suspended">Suspended</option></select></div>
+    {error && <p className="err" role="alert">{error}</p>}{result.loading ? <p className="muted">Loading users…</p> : result.error ? <p className="err" role="alert">{result.error}</p> : users.length ? <Table headings={['ID', 'Name', 'Email', 'Locality', 'Role', 'Joined', 'Orders', 'Status', 'Actions']}>{users.map((user) => <tr key={user.id}><td>{user.id.slice(-6)}</td><td>{user.name}</td><td>{user.email}</td><td>{user.locality || '—'}</td><td>{user.role}</td><td>{dateText(user.joined)}</td><td>{user.orderCount ?? 0}</td><td><Badge s={user.status}/></td><td><button className="btn ghost" onClick={() => t(`${user.name}: ${user.orderCount || 0} orders, phone ${user.phone || 'not provided'}`)}>Details</button><button className="btn ghost" disabled={user.id === s.user?.id} onClick={() => setPending(user)}>{user.status === 'Active' ? 'Suspend' : 'Activate'}</button></td></tr>)}</Table> : <Empty t="No matching users"/>}
+    {pending && <Confirm msg={`${pending.status === 'Active' ? 'Suspend' : 'Activate'} ${pending.name}?`} onClose={() => setPending(null)} onYes={changeStatus}/>}
+  </>;
+}
+
+export function AVendors() {
+  const { t } = useApp(); const [status, setStatus] = useState(''); const [pending, setPending] = useState(null); const [error, setError] = useState('');
+  const query = status ? `status=${encodeURIComponent(status)}` : ''; const result = useAdminResource('/admin/vendors', query); const vendors = (result.data?.vendors || []).map(asVendor);
+  const changeStatus = async () => {
+    setError('');
+    try {
+      const next = pending.nextStatus;
+      await api(`/admin/vendors/${pending.vendor.id}/status`, { method: 'PATCH', body: { status: next } });
+      await result.refresh();
+      t(`Vendor ${next.toLowerCase()}.`);
+    } catch (err) { setError(err.message); }
+    finally { setPending(null); }
+  };
+  return <><h1>Vendor verification</h1><div className="card filters"><select aria-label="Vendor status" value={status} onChange={(event) => setStatus(event.target.value)}><option value="">All statuses</option><option>Pending</option><option>Verified</option><option>Rejected</option></select></div>
+    {error && <p className="err" role="alert">{error}</p>}{result.loading ? <p className="muted">Loading vendors…</p> : result.error ? <p className="err" role="alert">{result.error}</p> : vendors.length ? <Table headings={['Business', 'Owner', 'Locality', 'Category', 'Submitted', 'Status', 'Actions']}>{vendors.map((vendor) => <tr key={vendor.id}><td>{vendor.name}</td><td>{vendor.owner?.name || vendor.owner?.email || '—'}</td><td>{vendor.locality}</td><td>{vendor.cat}</td><td>{dateText(vendor.submitted)}</td><td><Badge s={vendor.status}/></td><td className="row"><button className="btn ghost" onClick={() => t(`${vendor.name}: ${vendor.address || vendor.locality}, ${vendor.phone || 'no phone'}`)}>Details</button>{vendor.status === 'Pending' && <><button className="btn" onClick={() => setPending({ vendor, nextStatus: 'Verified' })}>Approve</button><button className="btn ghost" onClick={() => setPending({ vendor, nextStatus: 'Rejected' })}>Reject</button></>}</td></tr>)}</Table> : <Empty t="No vendors match this status"/>}
+    {pending && <Confirm msg={`Mark ${pending.vendor.name} as ${pending.nextStatus}?`} onClose={() => setPending(null)} onYes={changeStatus}/>}
+  </>;
+}
+
+export function AProducts() {
+  const { t } = useApp(); const [filters, setFilters] = useState({ approved: '', active: '', vendorId: '' }); const [deleting, setDeleting] = useState(null); const [error, setError] = useState('');
+  const query = new URLSearchParams(Object.entries(filters).filter(([, value]) => value)).toString();
+  const result = useAdminResource('/admin/products', query); const products = (result.data?.products || []).map(asProduct);
+  const vendors = [...new Map(products.filter((product) => product.vendor).map((product) => [product.vendor.id, product.vendor])).values()];
+  const setFilter = (key) => (event) => setFilters((current) => ({ ...current, [key]: event.target.value }));
+  const updateProduct = async (product, endpoint, body, message) => {
+    setError('');
+    try {
+      await api(`/admin/products/${product.id}/${endpoint}`, { method: 'PATCH', body });
+      await result.refresh();
+      t(message);
+    } catch (err) { setError(err.message); }
+  };
+  const removeProduct = async () => {
+    setError('');
+    try { await api(`/admin/products/${deleting.id}`, { method: 'DELETE' }); await result.refresh(); t('Product removed.'); }
+    catch (err) { setError(err.message); }
+    finally { setDeleting(null); }
+  };
+  return <><h1>Products</h1><div className="card filters"><select aria-label="Approval" value={filters.approved} onChange={setFilter('approved')}><option value="">All approval states</option><option value="false">Pending approval</option><option value="true">Approved</option></select><select aria-label="Availability" value={filters.active} onChange={setFilter('active')}><option value="">All availability</option><option value="true">Active</option><option value="false">Disabled</option></select><select aria-label="Vendor" value={filters.vendorId} onChange={setFilter('vendorId')}><option value="">All vendors</option>{vendors.map((vendor) => <option key={vendor.id} value={vendor.id}>{vendor.name}</option>)}</select></div>
+    {error && <p className="err" role="alert">{error}</p>}{result.loading ? <p className="muted">Loading products…</p> : result.error ? <p className="err" role="alert">{result.error}</p> : products.length ? <Table headings={['Product', 'Vendor', 'Category', 'Price', 'Stock', 'Approval', 'Availability', 'Actions']}>{products.map((product) => <tr key={product.id}><td>{product.name}</td><td>{product.vendor?.name || '—'}</td><td>{product.category}</td><td>{m(product.price)}</td><td>{product.stock}</td><td><Badge s={product.approved ? 'Approved' : 'Pending'}/></td><td><Badge s={product.active ? 'Active' : 'Disabled'}/></td><td className="row"><button className="btn" onClick={() => updateProduct(product, 'approval', { approved: !product.approved }, product.approved ? 'Product approval revoked.' : 'Product approved.')}>{product.approved ? 'Reject' : 'Approve'}</button><button className="btn ghost" onClick={() => updateProduct(product, 'availability', { active: !product.active }, product.active ? 'Product disabled.' : 'Product enabled.')}>{product.active ? 'Disable' : 'Enable'}</button><button className="btn ghost" onClick={() => setDeleting(product)}>Remove</button></td></tr>)}</Table> : <Empty t="No products match these filters"/>}
+    {deleting && <Confirm msg={`Remove ${deleting.name}?`} onClose={() => setDeleting(null)} onYes={removeProduct}/>}
+  </>;
+}
+
+export function AOrders() {
+  const [filters, setFilters] = useState({ status: '', vendor: '', customer: '', date: '' }); const result = useAdminResource('/admin/orders'); const orders = result.data?.orders || [];
+  const setFilter = (key) => (event) => setFilters((current) => ({ ...current, [key]: event.target.value }));
+  const vendors = [...new Map(orders.filter((order) => order.vendorId).map((order) => [order.vendorId._id, order.vendorId])).values()];
+  const customers = [...new Map(orders.filter((order) => order.customerId).map((order) => [order.customerId._id, order.customerId])).values()];
+  const filtered = orders.filter((order) => (!filters.status || order.status === filters.status) && (!filters.vendor || order.vendorId?._id === filters.vendor) && (!filters.customer || order.customerId?._id === filters.customer) && (!filters.date || new Date(order.date).toISOString().slice(0, 10) === filters.date));
+  return <><h1>Orders</h1><div className="card filters"><input aria-label="Date" type="date" value={filters.date} onChange={setFilter('date')}/><select aria-label="Vendor" value={filters.vendor} onChange={setFilter('vendor')}><option value="">All vendors</option>{vendors.map((vendor) => <option key={vendor._id} value={vendor._id}>{vendor.name}</option>)}</select><select aria-label="Customer" value={filters.customer} onChange={setFilter('customer')}><option value="">All customers</option>{customers.map((customer) => <option key={customer._id} value={customer._id}>{customer.name}</option>)}</select><select aria-label="Status" value={filters.status} onChange={setFilter('status')}><option value="">All statuses</option>{['Placed', 'Confirmed', 'Preparing', 'Out for Delivery', 'Delivered', 'Cancelled'].map((status) => <option key={status}>{status}</option>)}</select></div>
+    {result.loading ? <p className="muted">Loading orders…</p> : result.error ? <p className="err" role="alert">{result.error}</p> : filtered.length ? <Table headings={['Order', 'Customer', 'Vendor', 'Items', 'Amount', 'Date', 'Status']}>{filtered.map((order) => <tr key={order._id}><td>{String(order._id).slice(-6)}</td><td>{order.customerId?.name || '—'}</td><td>{order.vendorId?.name || '—'}</td><td>{order.items.map((item) => `${item.name} × ${item.qty}`).join(', ')}</td><td>{m(order.total)}</td><td>{dateText(order.date)}</td><td><Badge s={order.status}/></td></tr>)}</Table> : <Empty t="No matching orders"/>}
+  </>;
+}
+
+export function AComplaints() {
+  const { t } = useApp(); const [status, setStatus] = useState(''); const [error, setError] = useState('');
+  const query = status ? `status=${encodeURIComponent(status)}` : ''; const result = useAdminResource('/admin/complaints', query); const complaints = result.data?.complaints || [];
+  const changeStatus = async (complaint, nextStatus) => {
+    setError('');
+    try {
+      const { complaint: updated } = await api(`/admin/complaints/${complaint._id}/status`, { method: 'PATCH', body: { status: nextStatus } });
+      result.setData((current) => ({ ...current, complaints: status ? current.complaints.filter((item) => item._id !== updated._id) : current.complaints.map((item) => item._id === updated._id ? updated : item) }));
+      t(`Complaint marked ${nextStatus.toLowerCase()}.`);
+    } catch (err) { setError(err.message); }
+  };
+  return <><h1>Complaints</h1><div className="card filters"><select aria-label="Complaint status" value={status} onChange={(event) => setStatus(event.target.value)}><option value="">All complaints</option><option>Pending</option><option>Resolved</option></select></div>
+    {error && <p className="err" role="alert">{error}</p>}{result.loading ? <p className="muted">Loading complaints…</p> : result.error ? <p className="err" role="alert">{result.error}</p> : complaints.length ? <Table headings={['ID', 'User', 'Vendor', 'Issue', 'Date', 'Priority', 'Status', 'Actions']}>{complaints.map((complaint) => <tr key={complaint._id}><td>{String(complaint._id).slice(-6)}</td><td>{complaint.uid?.name || '—'}</td><td>{complaint.vendorId?.name || '—'}</td><td>{complaint.issue}</td><td>{dateText(complaint.date)}</td><td><Badge s={complaint.priority}/></td><td><Badge s={complaint.status}/></td><td className="row">{complaint.status === 'Pending' ? <button className="btn" onClick={() => changeStatus(complaint, 'Resolved')}>Resolve</button> : <button className="btn ghost" onClick={() => changeStatus(complaint, 'Pending')}>Mark pending</button>}</td></tr>)}</Table> : <Empty t="No complaints found"/>}
+  </>;
+}

@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { C, O, P, R, U, V } from './data/mock.js';
+import { R } from './data/mock.js';
 import { api, clearToken, getToken, setToken } from './api/api.js';
 
 const Ctx = createContext();
@@ -10,15 +10,13 @@ const read = (key, fallback) => {
 
 export function Provider({ children }) {
   const [s, S] = useState(() => ({
-    user: read('localkart-user', null),
+    user: null,
     authReady: !getToken(),
     cart: read('cart', []),
     locality: read('locality', 'All'),
-    // Mock collections remain only for the unintegrated admin screens. Customer
-    // and vendor workflows fetch their catalog, inventory, users, and orders via API.
-    products: P, vendors: V, orders: O, users: U,
-    // Reviews and complaints do not have backend endpoints in this phase.
-    reviews: R, complaints: C,
+    products: [], vendors: [], orders: [], users: [],
+    // The homepage still uses static testimonials; complaints are loaded from the admin API.
+    reviews: R, complaints: [],
   }));
   const [toast, T] = useState('');
 
@@ -34,14 +32,13 @@ export function Provider({ children }) {
     if (savedToken) {
       api('/auth/me').then(({ user }) => {
         if (!active) return;
-        localStorage.setItem('localkart-user', JSON.stringify(user));
         S((current) => ({ ...current, user, authReady: true }));
       }).catch((error) => {
         if (!active) return;
         if (error.status === 401) clearToken();
-        S((current) => ({ ...current, user: error.status === 401 ? null : current.user, authReady: true }));
+        S((current) => ({ ...current, user: null, authReady: true }));
       });
-    }
+    } else localStorage.removeItem('localkart-user');
     return () => { active = false; window.removeEventListener('localkart-session-expired', onExpired); };
   }, []);
 
@@ -52,7 +49,6 @@ export function Provider({ children }) {
   });
   const login = (user, token) => {
     setToken(token);
-    localStorage.setItem('localkart-user', JSON.stringify(user));
     S((current) => ({ ...current, user, authReady: true }));
   };
   const logout = () => {

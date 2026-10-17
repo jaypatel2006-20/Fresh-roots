@@ -114,6 +114,9 @@ router.post('/login', async (req, res) => {
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ message: 'Invalid email or password.' });
     }
+    if (user.status === 'Suspended') {
+      return res.status(403).json({ message: 'This account is suspended.' });
+    }
 
     const token = jwt.sign(
       { sub: user._id.toString() },
