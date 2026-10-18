@@ -107,9 +107,10 @@ router.post('/', authenticateToken, authorizeRoles('customer'), async (req, res)
       created.push(order);
     }
 
+    const responseOrders = await Promise.all(created.map((order) => populatedOrder(Order.findById(order._id))));
     return res.status(201).json({
       message: 'Order placed successfully.',
-      orders: created,
+      orders: responseOrders,
     });
   } catch (error) {
     // Standalone MongoDB deployments do not support transactions. Undo all

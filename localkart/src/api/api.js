@@ -24,7 +24,7 @@ export async function api(path, { method = 'GET', body, headers = {}, ...options
       ...options,
     });
   } catch {
-    throw new ApiError(`Cannot reach the LocalKart API at ${API_URL}. Check that the backend is running.`);
+    throw new ApiError(`Cannot reach the FreshRoots API at ${API_URL}. Check that the backend is running.`);
   }
 
   let data = null;
@@ -32,6 +32,7 @@ export async function api(path, { method = 'GET', body, headers = {}, ...options
   if (!response.ok) {
     if (response.status === 401 && token) {
       localStorage.removeItem(TOKEN_KEY);
+      sessionStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem('localkart-user');
       window.dispatchEvent(new Event('localkart-session-expired'));
     }
@@ -40,9 +41,20 @@ export async function api(path, { method = 'GET', body, headers = {}, ...options
   return data;
 }
 
-export const setToken = (token) => localStorage.setItem(TOKEN_KEY, token);
-export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
-export const getToken = () => localStorage.getItem(TOKEN_KEY);
+export const setToken = (token, remember = true) => {
+  if (remember) {
+    sessionStorage.removeItem(TOKEN_KEY);
+    localStorage.setItem(TOKEN_KEY, token);
+  } else {
+    localStorage.removeItem(TOKEN_KEY);
+    sessionStorage.setItem(TOKEN_KEY, token);
+  }
+};
+export const clearToken = () => {
+  localStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(TOKEN_KEY);
+};
+export const getToken = () => localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
 
 export function asVendor(vendor) {
   if (!vendor) return null;

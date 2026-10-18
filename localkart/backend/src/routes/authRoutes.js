@@ -33,6 +33,10 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ message: 'Enter a valid email address.' });
     }
 
+    if (typeof phone !== 'string' || !/^\d{10}$/.test(phone.trim())) {
+      return res.status(400).json({ message: 'Phone must be a 10 digit number.' });
+    }
+
     if (typeof password !== 'string' || password.length < 8) {
       return res.status(400).json({ message: 'Password must contain at least 8 characters.' });
     }

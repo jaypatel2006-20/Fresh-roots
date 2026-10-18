@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useApp } from '../store.jsx';
 import { categories } from '../data/mock.js';
-import { Badge, Modal, Confirm, Empty, m } from '../ui.jsx';
+import { Badge, Modal, Confirm, Empty, Loading, m } from '../ui.jsx';
 import { api, asOrder, asProduct } from '../api/api.js';
 
 function useVendorData() {
@@ -23,7 +23,7 @@ function useVendorData() {
 const Stat = ({ label, value }) => <div className="card"><p className="muted small">{label}</p><h2>{value}</h2></div>;
 export const Bars = ({ data }) => { const max = Math.max(1, ...data.map((item) => item[1])); return <div className="bars" role="img" aria-label="Bar chart">{data.map(([label, value]) => <div key={label}><i style={{ height: `${value / max * 100}%` }}/><span>{label}</span><b>{value}</b></div>)}</div>; };
 
-function VendorLoad({ data }) { return data.loading ? <p className="muted">Loading your vendor data…</p> : data.error ? <p className="err" role="alert">{data.error}</p> : null; }
+function VendorLoad({ data }) { return data.loading ? <Loading label="Loading your vendor data…"/> : data.error ? <p className="err" role="alert">{data.error}</p> : null; }
 
 export function VDash() {
   const data = useVendorData(); const { products, orders } = data;

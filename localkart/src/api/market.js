@@ -3,9 +3,13 @@ import { api, asProduct, asVendor } from './api.js';
 export async function getProducts(filters = {}) {
   const params = new URLSearchParams();
   const names = { q: 'q', category: 'category', vendorId: 'vendorId', maxPrice: 'maxPrice', minRating: 'minRating', inStock: 'inStock', locality: 'locality', sort: 'sort' };
+  const sortValues = { pa: 'priceAsc', pd: 'priceDesc', r: 'ratingDesc' };
   Object.entries(names).forEach(([key, queryName]) => {
     const value = filters[key];
-    if (value !== undefined && value !== '' && value !== false && value !== null) params.set(queryName, value === true ? 'true' : String(value));
+    if (value !== undefined && value !== '' && value !== false && value !== null) {
+      const normalized = key === 'sort' ? (sortValues[value] || value) : value;
+      params.set(queryName, normalized === true ? 'true' : String(normalized));
+    }
   });
   const suffix = params.size ? `?${params}` : '';
   const { products = [] } = await api(`/products${suffix}`);
