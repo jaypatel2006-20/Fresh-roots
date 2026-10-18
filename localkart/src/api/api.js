@@ -1,6 +1,15 @@
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '');
 const TOKEN_KEY = 'localkart-token';
 
+// Remembered sessions live in localStorage; tab-only sessions live in sessionStorage.
+// Prefer the persistent token if recovering from an older version that left both behind.
+export const getToken = () => {
+  const persistentToken = localStorage.getItem(TOKEN_KEY);
+  const sessionToken = sessionStorage.getItem(TOKEN_KEY);
+  if (persistentToken && sessionToken) sessionStorage.removeItem(TOKEN_KEY);
+  return persistentToken || sessionToken;
+};
+
 export class ApiError extends Error {
   constructor(message, status = 0) {
     super(message);
@@ -12,7 +21,7 @@ export class ApiError extends Error {
 export async function api(path, { method = 'GET', body, headers = {}, ...options } = {}) {
   const requestHeaders = { ...headers };
   if (body !== undefined) requestHeaders['Content-Type'] = 'application/json';
-  const token = localStorage.getItem(TOKEN_KEY);
+  const token = getToken();
   if (token) requestHeaders.Authorization = `Bearer ${token}`;
 
   let response;
@@ -54,7 +63,6 @@ export const clearToken = () => {
   localStorage.removeItem(TOKEN_KEY);
   sessionStorage.removeItem(TOKEN_KEY);
 };
-export const getToken = () => localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
 
 export function asVendor(vendor) {
   if (!vendor) return null;

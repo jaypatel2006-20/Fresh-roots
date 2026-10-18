@@ -141,5 +141,5 @@ export function OrderTracking() {
 
 export function Profile() {
   const { s } = useApp(); const { user } = s;
-  return <><h1>Profile</h1><div className="card"><p><b>Name:</b> {user.name}</p><p><b>Email:</b> {user.email}</p><p><b>Role:</b> {user.role}</p>{user.vendorId && <p><b>Vendor profile:</b> {user.vendorId}</p>}<p className="muted small">Profile changes are not supported by the current backend API.</p></div></>;
+  return <><h1>Profile</h1><div className="card"><p><b>Name:</b> {user.name}</p><p><b>Email:</b> {user.email}</p><p><b>Role:</b> {user.role}</p>{user.vendorId && <p><b>Vendor profile:</b> {user.vendorId}</p>}</div></>;
 }

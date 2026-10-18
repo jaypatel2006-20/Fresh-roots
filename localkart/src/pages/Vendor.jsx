@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useApp } from '../store.jsx';
 import { categories } from '../data/mock.js';
 import { Badge, Modal, Confirm, Empty, Loading, m } from '../ui.jsx';
@@ -20,8 +21,8 @@ function useVendorData() {
   return { products, orders, setProducts, setOrders, loading, error, refresh };
 }
 
-const Stat = ({ label, value }) => <div className="card"><p className="muted small">{label}</p><h2>{value}</h2></div>;
-export const Bars = ({ data }) => { const max = Math.max(1, ...data.map((item) => item[1])); return <div className="bars" role="img" aria-label="Bar chart">{data.map(([label, value]) => <div key={label}><i style={{ height: `${value / max * 100}%` }}/><span>{label}</span><b>{value}</b></div>)}</div>; };
+const Stat = ({ label, value, className = '' }) => <div className={`card ${className}`}><p className="muted small">{label}</p><h2>{value}</h2></div>;
+export const Bars = ({ data, className = '' }) => { const max = Math.max(1, ...data.map((item) => item[1])); return <div className={`bars ${className}`} role="img" aria-label="Bar chart">{data.map(([label, value]) => <div key={label} data-zero={value === 0}><i style={{ height: `${value / max * 100}%` }}/><span>{label}</span><b>{value}</b></div>)}</div>; };
 
 function VendorLoad({ data }) { return data.loading ? <Loading label="Loading your vendor data…"/> : data.error ? <p className="err" role="alert">{data.error}</p> : null; }
 
@@ -30,10 +31,12 @@ export function VDash() {
   const delivered = orders.filter((order) => order.status === 'Delivered'); const low = products.filter((product) => product.stock <= product.min);
   const top = products.map((product) => [product.name, orders.reduce((sum, order) => sum + order.items.filter((item) => String(item.pid) === product.id).reduce((qty, item) => qty + item.qty, 0), 0)]).sort((a, b) => b[1] - a[1]).slice(0, 5);
   const byDate = {}; delivered.forEach((order) => { const date = new Date(order.date).toLocaleDateString(); byDate[date] = (byDate[date] || 0) + order.total; });
-  return <><h1>Dashboard</h1><VendorLoad data={data}/>{!data.loading && !data.error && <><div className="grid sm"><Stat label="Total sales" value={m(delivered.reduce((sum, order) => sum + order.total, 0))}/><Stat label="Orders" value={orders.length}/><Stat label="Products" value={products.length}/><Stat label="Pending orders" value={orders.filter((order) => order.status === 'Placed').length}/><Stat label="Low stock" value={low.length}/></div>
-    <div className="grid"><div className="card"><h3>Sales over time</h3>{Object.keys(byDate).length ? <Bars data={Object.entries(byDate)}/> : <p className="muted">No delivered orders yet.</p>}</div><div className="card"><h3>Orders by status</h3><Bars data={['Placed', 'Confirmed', 'Preparing', 'Out for Delivery', 'Delivered'].map((status) => [status, orders.filter((order) => order.status === status).length])}/></div></div>
-    <div className="grid"><div className="card"><h3>Top-selling products</h3>{top.length ? top.map(([name, qty]) => <p key={name}>{name}: {qty} sold</p>) : <p className="muted">No product sales yet.</p>}</div><div className="card"><h3>Low-stock alerts</h3>{low.length ? low.map((product) => <p key={product.id}>{product.name}: {product.stock} left</p>) : <p className="muted">All stocked.</p>}</div></div>
-    <div className="card"><h3>Recent orders</h3>{orders.slice(0, 5).length ? orders.slice(0, 5).map((order) => <p key={order.id}>{order.id} - {m(order.total)} <Badge s={order.status}/></p>) : <p className="muted">No orders yet.</p>}</div></>}</>;
+  return <><h1>Dashboard</h1><VendorLoad data={data}/>{!data.loading && !data.error && <div className="vendor-dashboard">
+    <div className="vendor-stats"><Stat className="vendor-stat" label="Total sales" value={m(delivered.reduce((sum, order) => sum + order.total, 0))}/><Stat className="vendor-stat" label="Orders" value={orders.length}/><Stat className="vendor-stat" label="Products" value={products.length}/><Stat className="vendor-stat" label="Pending orders" value={orders.filter((order) => order.status === 'Placed').length}/><Stat className="vendor-stat" label="Low stock" value={low.length}/></div>
+    <div className="vendor-charts"><section className="card vendor-panel"><h3>Sales over time</h3>{Object.keys(byDate).length ? <Bars className="vendor-sales-chart" data={Object.entries(byDate)}/> : <p className="vendor-chart-empty muted">No delivered orders yet.</p>}</section><section className="card vendor-panel vendor-status-panel"><h3>Orders by status</h3><Bars className="vendor-status-chart" data={['Placed', 'Confirmed', 'Preparing', 'Out for Delivery', 'Delivered'].map((status) => [status, orders.filter((order) => order.status === status).length])}/></section></div>
+    <div className="vendor-lists"><section className="card vendor-panel"><h3>Top-selling products</h3><div className="vendor-list">{top.length ? top.map(([name, qty]) => <div className="vendor-list-row" key={name}><span>{name}</span><b>{qty} sold</b></div>) : <p className="vendor-list-empty muted">No product sales yet.</p>}</div></section><section className="card vendor-panel"><h3>Low-stock alerts</h3><div className="vendor-list">{low.length ? low.map((product) => <div className="vendor-list-row" key={product.id}><span>{product.name}</span><Badge s={`${product.stock} left`}/></div>) : <p className="vendor-list-empty muted">All stocked.</p>}</div></section></div>
+    <section className="card vendor-panel vendor-recent"><h3>Recent orders</h3>{orders.slice(0, 5).length ? <div className="vendor-order-list">{orders.slice(0, 5).map((order) => <div className="vendor-order-row" key={order.id}><span className="vendor-order-id" title={order.id}>{order.id}</span><b>{m(order.total)}</b><Badge s={order.status}/></div>)}</div> : <p className="vendor-list-empty muted">No orders yet.</p>}</section>
+  </div>}</>;
 }
 
 export function VProducts() {
@@ -93,5 +96,43 @@ export function VInventory() {
 }
 
 export function VStore() {
-  return <><h1>Store profile</h1><div className="card"><p>Store details are collected during registration.</p><p className="muted small">The current backend has no private vendor-profile read or update endpoint. Product and order management remain available through their existing APIs.</p></div></>;
+  const { s } = useApp();
+  const vendorId = s.user?.vendorId;
+  const [vendor, setVendor] = useState(null);
+  const [loading, setLoading] = useState(Boolean(vendorId));
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    if (!vendorId) {
+      setVendor(null);
+      setLoading(false);
+      return () => { active = false; };
+    }
+
+    setLoading(true);
+    setError('');
+    api(`/vendors/${encodeURIComponent(vendorId)}`)
+      .then(({ vendor: profile }) => { if (active) setVendor(profile); })
+      .catch((err) => {
+        if (!active) return;
+        if (err.status !== 404) setError(err.message);
+        setVendor(null);
+      })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [vendorId]);
+
+  return <><h1>Store profile</h1><section className="card">
+    <div className="row between"><h3>Store information</h3>{vendor?.status && <Badge s={vendor.status}/>}</div>
+    {error && <p className="err" role="alert">{error}</p>}
+    {loading ? <Loading label="Loading store information…"/> : vendor ? <>
+      <p><b>Store name:</b> {vendor.name}</p>
+      {vendor.cat && <p><b>Category:</b> {vendor.cat}</p>}
+      {vendor.locality && <p><b>Locality:</b> {vendor.locality}</p>}
+      {vendor.address && <p><b>Address:</b> {vendor.address}</p>}
+      {vendor.phone && <p><b>Contact number:</b> {vendor.phone}</p>}
+    </> : <p className="muted">Public store details are not available yet.</p>}
+    <div className="row"><Link className="btn ghost" to="/vendor/products">Manage products</Link><Link className="btn ghost" to="/vendor/orders">View orders</Link></div>
+  </section></>;
 }

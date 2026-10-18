@@ -63,13 +63,34 @@ export function ProductDetails() {
   const product = useRequest(() => getProduct(id), [id]);
   const p = product.data;
   const related = useRequest(() => p ? getProducts({ category: p.category, ...(s.locality !== 'All' ? { locality: s.locality } : {}) }) : Promise.resolve([]), [p?.id, p?.category, s.locality]);
+  const relatedProducts = related.data?.filter((item) => item.id !== p?.id).slice(0, 4) || [];
   if (product.loading) return <Loading label="Loading product…"/>;
   if (product.error) return <Empty t={product.error}><Link to="/products">Back to products</Link></Empty>;
   const vendor = p.vendor;
-  return <><div className="split"><Img n={p.name}/><div><h1>{p.name}</h1><p><b>{m(p.price)}</b> per {p.unit} - ★ {p.rating}</p><p>Sold by <Link to={`/vendors/${vendor?.id}`}>{vendor?.name || 'Local vendor'}</Link>{vendor?.locality ? ` (${vendor.locality})` : ''}</p><p>{p.stock > 0 ? `${p.stock} in stock` : 'Out of stock'}</p>
-    <div className="row"><label>Qty<input type="number" min="1" max={p.stock} value={quantity} onChange={(event) => setQuantity(Math.max(1, Number(event.target.value) || 1))}/></label></div><div className="row"><button className="btn" disabled={!p.stock} onClick={() => add(p, quantity)}>Add to Cart</button><button className="btn ghost" disabled={!p.stock} onClick={() => add(p, quantity, () => nav('/cart'))}>Buy Now</button></div>
-    <h3>Description</h3><p>{p.desc}</p><p className="muted small">Category: {p.category}</p></div></div>
-    <h2>Reviews</h2><p className="muted">Reviews are not available from the current API.</p><h2>Related products</h2>{related.loading ? <Loading label="Loading related products…"/> : related.error ? <p className="err" role="alert">{related.error}</p> : <div className="grid">{related.data.filter((item) => item.id !== p.id).slice(0, 4).map((item) => <ProductCard key={item.id} p={item}/>)}</div>}</>;
+  return <><section className="product-detail-layout">
+    <ProductVisual key={p.id} product={p}/>
+    <div className="product-detail-info">
+      <h1>{p.name}</h1>
+      <div className="product-price-rating"><p><b>{m(p.price)}</b><span> / {p.unit}</span></p><p className="muted">Rating: {p.rating}</p></div>
+      <p className="product-vendor">Sold by <Link to={`/vendors/${vendor?.id}`}>{vendor?.name || 'Local vendor'}</Link>{vendor?.locality ? <span className="muted">, {vendor.locality}</span> : null}</p>
+      <p className={`product-stock ${p.stock > 0 ? 'in-stock' : 'out-of-stock'}`}>{p.stock > 0 ? `${p.stock} in stock` : 'Out of stock'}</p>
+      <div className="product-purchase">
+        <label className="product-quantity">Quantity<input type="number" min="1" max={p.stock} value={quantity} onChange={(event) => setQuantity(Math.max(1, Number(event.target.value) || 1))}/></label>
+        <div className="product-actions"><button className="btn" disabled={!p.stock} onClick={() => add(p, quantity)}>Add to Cart</button><button className="btn ghost" disabled={!p.stock} onClick={() => add(p, quantity, () => nav('/cart'))}>Buy Now</button></div>
+      </div>
+      <div className="product-description"><h3>Description</h3><p>{p.desc}</p><p className="muted small">Category: {p.category}</p></div>
+    </div>
+  </section>
+    {related.loading ? <><h2>Related products</h2><Loading label="Loading related products…"/></> : related.error ? <><h2>Related products</h2><p className="err" role="alert">{related.error}</p></> : relatedProducts.length > 0 && <><h2>Related products</h2><div className="grid">{relatedProducts.map((item) => <ProductCard key={item.id} p={item}/>)}</div></>}</>;
+}
+
+function ProductVisual({ product }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const image = product.image || product.imageUrl;
+  if (image && !imageFailed) {
+    return <img className="product-detail-visual" src={image} alt={product.name} onError={() => setImageFailed(true)}/>;
+  }
+  return <div className="product-detail-visual product-visual-fallback" role="img" aria-label={`${product.name} image unavailable`}><span className="product-visual-mark" aria-hidden="true"/></div>;
 }
 
 export function Vendors() {
@@ -85,5 +106,5 @@ export function VendorPage() {
   const v = vendor.data;
   return <><section className="hero"><h1>{v.name} <Badge s="Verified"/></h1><p>★ {v.rating} - {v.address || v.locality}</p><p>{v.desc}</p><p>{v.radius ? `Delivery within ${v.radius} km - ` : ''}{v.hours ? `Open ${v.hours} - ` : ''}{v.cat}</p></section>
     <h2>Products</h2>{products.loading ? <Loading label="Loading products…"/> : products.error ? <p className="err" role="alert">{products.error}</p> : products.data.length ? <div className="grid">{products.data.map((product) => <ProductCard key={product.id} p={{ ...product, vendor: v }}/>)}</div> : <Empty t="No products available yet"/>}
-    <h2>Reviews</h2><p className="muted">Reviews are not available from the current API.</p></>;
+    </>;
 }
