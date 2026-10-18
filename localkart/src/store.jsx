@@ -47,8 +47,8 @@ export function Provider({ children }) {
     if (key === 'cart' || key === 'locality') localStorage.setItem(key, JSON.stringify(nextValue));
     return { ...previous, [key]: nextValue };
   });
-  const login = (user, token) => {
-    setToken(token);
+  const login = (user, token, remember = true) => {
+    setToken(token, remember);
     S((current) => ({ ...current, user, authReady: true }));
   };
   const logout = () => {

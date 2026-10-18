@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../store.jsx';
 import { localities, categories } from '../data/mock.js';
 import { api } from '../api/api.js';
@@ -9,7 +9,9 @@ const home = { customer: '/products', vendor: '/vendor/dashboard', admin: '/' };
 export function Login() {
   const { login, t } = useApp();
   const nav = useNavigate();
+  const location = useLocation();
   const [form, setForm] = useState({ email: '', password: '' });
+  const [remember, setRemember] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const update = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
@@ -17,16 +19,20 @@ export function Login() {
     event.preventDefault(); setError(''); setBusy(true);
     try {
       const result = await api('/auth/login', { method: 'POST', body: form });
-      login(result.user, result.token);
+      login(result.user, result.token, remember);
       t(`Welcome back, ${result.user.name}.`);
-      nav(home[result.user.role] || '/');
+      const returnTo = location.state?.from;
+      const returnPath = returnTo?.pathname?.startsWith('/') && !returnTo.pathname.startsWith('//')
+        ? `${returnTo.pathname}${returnTo.search || ''}${returnTo.hash || ''}`
+        : home[result.user.role] || '/';
+      nav(returnPath, { replace: true });
     } catch (err) { setError(err.message); }
     finally { setBusy(false); }
   };
   return <form className="card form" onSubmit={submit}><h2>Login</h2>{error && <p className="err" role="alert">{error}</p>}
     <label>Email<input type="email" required value={form.email} onChange={update('email')}/></label>
     <label>Password<input type="password" required value={form.password} onChange={update('password')}/></label>
-    <label className="chk"><input type="checkbox"/> Remember me</label><button className="btn" disabled={busy}>{busy ? 'Logging in…' : 'Login'}</button>
+    <label className="chk"><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)}/> Remember me</label><button className="btn" disabled={busy}>{busy ? 'Logging in…' : 'Login'}</button>
     <p>New here? <Link to="/register">Create an account</Link></p>
   </form>;
 }
