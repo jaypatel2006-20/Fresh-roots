@@ -12,7 +12,7 @@ export class ApiError extends Error {
 export async function api(path, { method = 'GET', body, headers = {}, ...options } = {}) {
   const requestHeaders = { ...headers };
   if (body !== undefined) requestHeaders['Content-Type'] = 'application/json';
-  const token = localStorage.getItem(TOKEN_KEY);
+  const token = localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
   if (token) requestHeaders.Authorization = `Bearer ${token}`;
 
   let response;
