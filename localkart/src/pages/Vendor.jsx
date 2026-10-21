@@ -1,29 +1,446 @@
-import {useState} from 'react';import {useApp} from '../store.jsx';import {categories} from '../data/mock.js';import {Badge,Modal,Confirm,Empty,m} from '../ui.jsx';
-const useV=()=>{const {s}=useApp();const vid=s.user.vendorId;return {vid,v:s.vendors.find(v=>v.id===vid),ps:s.products.filter(p=>p.vendorId===vid),os:s.orders.filter(o=>o.vendorId===vid)}};
-const Stat=({l,v})=><div className="card"><p className="muted small">{l}</p><h2>{v}</h2></div>;
-export const Bars=({data})=>{const mx=Math.max(1,...data.map(d=>d[1]));return <div className="bars" role="img" aria-label="Bar chart">{data.map(([l,n])=><div key={l}><i style={{height:(n/mx*100)+'%'}}/><span>{l}</span><b>{n}</b></div>)}</div>};
-export function VDash(){const {s}=useApp();const {ps,os}=useV();const ok=os.filter(o=>o.status==='Delivered');const low=ps.filter(p=>p.stock<=p.min);
- const top=ps.map(p=>[p.name,os.reduce((a,o)=>a+o.items.filter(i=>i.pid===p.id).reduce((x,i)=>x+i.qty,0),0)]).sort((a,b)=>b[1]-a[1]).slice(0,5);
- const byDate={};ok.forEach(o=>byDate[o.date.slice(5)]=(byDate[o.date.slice(5)]||0)+o.total);
- return <><h1>Dashboard</h1><div className="grid sm"><Stat l="Total sales" v={m(ok.reduce((a,o)=>a+o.total,0))}/><Stat l="Orders" v={os.length}/><Stat l="Products" v={ps.length}/><Stat l="Pending orders" v={os.filter(o=>o.status==='Placed').length}/><Stat l="Low stock" v={low.length}/></div>
- <div className="grid"><div className="card"><h3>Sales over time</h3>{Object.keys(byDate).length?<Bars data={Object.entries(byDate)}/>:<p className="muted">No delivered orders yet.</p>}</div><div className="card"><h3>Orders by status</h3><Bars data={['Placed','Preparing','Delivered','Cancelled'].map(x=>[x.slice(0,6),os.filter(o=>o.status===x).length])}/></div></div>
- <div className="grid"><div className="card"><h3>Top-selling products</h3>{top.map(t=><p key={t[0]}>{t[0]}: {t[1]} sold</p>)}</div><div className="card"><h3>Low-stock alerts</h3>{low.length?low.map(p=><p key={p.id}>{p.name}: {p.stock} left</p>):<p className="muted">All stocked.</p>}</div></div>
- <div className="card"><h3>Recent orders</h3>{os.slice(0,5).map(o=><p key={o.id}>{o.id} - {m(o.total)} <Badge s={o.status}/></p>)}</div></>}
-export function VProducts(){const {s,set,t}=useApp();const {vid,ps}=useV();const [ed,Ed]=useState(null);const [del,Del]=useState(null);
- const save=e=>{e.preventDefault();const f=ed;if(f.price<=0||f.stock<0)return t('Enter a valid price and stock');f.id?set('products',x=>x.map(p=>p.id===f.id?f:p)):set('products',x=>[...x,{...f,id:Date.now(),vendorId:vid,rating:0,approved:true}]);t(f.id?'Product updated':'Product added');Ed(null)};
- const u=k=>e=>Ed({...ed,[k]:e.target.type==='number'?+e.target.value:e.target.value});
- return <><div className="row between"><h1>Products</h1><button className="btn" onClick={()=>Ed({name:'',category:categories[0],desc:'',price:0,unit:'kg',stock:0,min:10,active:true})}>Add product</button></div>
- {ps.length?<div className="tw"><table><thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Stock</th><th>Status</th><th>Actions</th></tr></thead><tbody>{ps.map(p=><tr key={p.id}><td>{p.name}</td><td>{p.category}</td><td>{m(p.price)}/{p.unit}</td><td>{p.stock}</td><td><Badge s={p.active?'Active':'Disabled'}/></td>
- <td className="row"><button className="btn ghost" onClick={()=>Ed(p)}>Edit</button><button className="btn ghost" onClick={()=>set('products',x=>x.map(y=>y.id===p.id?{...y,active:!y.active}:y))}>{p.active?'Disable':'Enable'}</button><button className="btn ghost" onClick={()=>Del(p)}>Delete</button></td></tr>)}</tbody></table></div>:<Empty t="No products yet"/>}
- {ed&&<Modal title={ed.id?'Edit product':'Add product'} onClose={()=>Ed(null)}><form className="form" onSubmit={save}><label>Name<input required value={ed.name} onChange={u('name')}/></label><label>Category<select value={ed.category} onChange={u('category')}>{categories.map(c=><option key={c}>{c}</option>)}</select></label><label>Description<textarea value={ed.desc} onChange={u('desc')}/></label>
- <label>Price<input type="number" min="1" required value={ed.price} onChange={u('price')}/></label><label>Unit<input required value={ed.unit} onChange={u('unit')}/></label><label>Stock<input type="number" min="0" required value={ed.stock} onChange={u('stock')}/></label><label>Image<input type="file"/></label><label className="chk"><input type="checkbox" checked={ed.active} onChange={e=>Ed({...ed,active:e.target.checked})}/> Available</label><button className="btn">Save product</button></form></Modal>}
- {del&&<Confirm msg={'Delete '+del.name+'?'} onClose={()=>Del(null)} onYes={()=>{set('products',x=>x.filter(p=>p.id!==del.id));t('Product deleted successfully')}}/>}</>}
-const nx={Placed:'Confirmed',Confirmed:'Preparing',Preparing:'Out for Delivery','Out for Delivery':'Delivered'};
-export function VOrders(){const {s,set,t}=useApp();const {os}=useV();const go=(o,st)=>{set('orders',x=>x.map(y=>y.id===o.id?{...y,status:st}:y));t('Order '+o.id+' marked '+st)};
- return <><h1>Orders</h1>{os.length?<div className="tw"><table><thead><tr><th>Order</th><th>Customer</th><th>Products</th><th>Amount</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead><tbody>{os.map(o=><tr key={o.id}><td>{o.id}</td><td>{s.users.find(u=>u.id===o.customerId)?.name}</td><td>{o.items.map(i=>i.name+' x '+i.qty).join(', ')}</td><td>{m(o.total)}</td><td>{o.date}</td><td><Badge s={o.status}/></td>
- <td className="row">{nx[o.status]&&<button className="btn" onClick={()=>go(o,nx[o.status])}>{o.status==='Placed'?'Accept':'Mark '+nx[o.status]}</button>}{o.status==='Placed'&&<button className="btn ghost" onClick={()=>go(o,'Rejected')}>Reject</button>}</td></tr>)}</tbody></table></div>:<Empty t="No orders yet"/>}</>}
-export function VInventory(){const {set,t}=useApp();const {ps}=useV();
- return <><h1>Inventory</h1><div className="tw"><table><thead><tr><th>Product</th><th>Current stock</th><th>Minimum</th><th>Status</th><th>Update</th></tr></thead><tbody>{ps.map(p=><tr key={p.id}><td>{p.name}</td><td><input aria-label="Stock" type="number" min="0" value={p.stock} onChange={e=>set('products',x=>x.map(y=>y.id===p.id?{...y,stock:Math.max(0,+e.target.value)}:y))}/></td><td>{p.min}</td><td><Badge s={p.stock===0?'Rejected':p.stock<=p.min?'Pending':'Verified'}/> {p.stock===0?'Out of Stock':p.stock<=p.min?'Low Stock':'In Stock'}</td><td><button className="btn ghost" onClick={()=>t('Stock saved')}>Save</button></td></tr>)}</tbody></table></div></>}
-export function VStore(){const {set,t}=useApp();const {v}=useV();const [f,F]=useState(v);const u=k=>e=>F({...f,[k]:e.target.value});
- return <><h1>Store profile</h1><p>Verification: <Badge s={v.status}/></p><form className="card form" onSubmit={e=>{e.preventDefault();set('vendors',x=>x.map(y=>y.id===f.id?f:y));t('Store updated')}}><label>Business name<input required value={f.name} onChange={u('name')}/></label><label>Description<textarea value={f.desc} onChange={u('desc')}/></label><label>Address<input value={f.address} onChange={u('address')}/></label>
- <label>Contact<input value={f.phone} onChange={u('phone')}/></label><label>Category<select value={f.cat} onChange={u('cat')}>{categories.map(c=><option key={c}>{c}</option>)}</select></label><label>Delivery radius (km)<input type="number" min="1" value={f.radius} onChange={u('radius')}/></label><label>Opening hours<input value={f.hours} onChange={u('hours')}/></label><label>Logo and cover<input type="file"/></label><button className="btn">Save changes</button></form></>}
+import { useState } from 'react';
+import { useApp } from '../store.jsx';
+import { categories } from '../data/mock.js';
+import { Badge, Modal, Confirm, Empty, m } from '../ui.jsx';
+const useV = () => {
+  const { s } = useApp();
+  const vid = s.user.vendorId;
+  return {
+    vid,
+    v: s.vendors.find((v) => v.id === vid),
+    ps: s.products.filter((p) => p.vendorId === vid),
+    os: s.orders.filter((o) => o.vendorId === vid),
+  };
+};
+const Stat = ({ l, v }) => (
+  <div className="card">
+    <p className="muted small">{l}</p>
+    <h2>{v}</h2>
+  </div>
+);
+export const Bars = ({ data }) => {
+  const mx = Math.max(1, ...data.map((d) => d[1]));
+  return (
+    <div className="bars" role="img" aria-label="Bar chart">
+      {data.map(([l, n]) => (
+        <div key={l}>
+          <i style={{ height: (n / mx) * 100 + '%' }} />
+          <span>{l}</span>
+          <b>{n}</b>
+        </div>
+      ))}
+    </div>
+  );
+};
+export function VDash() {
+  const { s } = useApp();
+  const { ps, os } = useV();
+  const ok = os.filter((o) => o.status === 'Delivered');
+  const low = ps.filter((p) => p.stock <= p.min);
+  const top = ps
+    .map((p) => [
+      p.name,
+      os.reduce(
+        (a, o) => a + o.items.filter((i) => i.pid === p.id).reduce((x, i) => x + i.qty, 0),
+        0
+      ),
+    ])
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+  const byDate = {};
+  ok.forEach((o) => (byDate[o.date.slice(5)] = (byDate[o.date.slice(5)] || 0) + o.total));
+  return (
+    <>
+      <h1>Dashboard</h1>
+      <div className="grid sm">
+        <Stat l="Total sales" v={m(ok.reduce((a, o) => a + o.total, 0))} />
+        <Stat l="Orders" v={os.length} />
+        <Stat l="Products" v={ps.length} />
+        <Stat l="Pending orders" v={os.filter((o) => o.status === 'Placed').length} />
+        <Stat l="Low stock" v={low.length} />
+      </div>
+      <div className="grid">
+        <div className="card">
+          <h3>Sales over time</h3>
+          {Object.keys(byDate).length ? (
+            <Bars data={Object.entries(byDate)} />
+          ) : (
+            <p className="muted">No delivered orders yet.</p>
+          )}
+        </div>
+        <div className="card">
+          <h3>Orders by status</h3>
+          <Bars
+            data={['Placed', 'Preparing', 'Delivered', 'Cancelled'].map((x) => [
+              x.slice(0, 6),
+              os.filter((o) => o.status === x).length,
+            ])}
+          />
+        </div>
+      </div>
+      <div className="grid">
+        <div className="card">
+          <h3>Top-selling products</h3>
+          {top.map((t) => (
+            <p key={t[0]}>
+              {t[0]}: {t[1]} sold
+            </p>
+          ))}
+        </div>
+        <div className="card">
+          <h3>Low-stock alerts</h3>
+          {low.length ? (
+            low.map((p) => (
+              <p key={p.id}>
+                {p.name}: {p.stock} left
+              </p>
+            ))
+          ) : (
+            <p className="muted">All stocked.</p>
+          )}
+        </div>
+      </div>
+      <div className="card">
+        <h3>Recent orders</h3>
+        {os.slice(0, 5).map((o) => (
+          <p key={o.id}>
+            {o.id} - {m(o.total)} <Badge s={o.status} />
+          </p>
+        ))}
+      </div>
+    </>
+  );
+}
+export function VProducts() {
+  const { s, set, t } = useApp();
+  const { vid, ps } = useV();
+  const [ed, Ed] = useState(null);
+  const [del, Del] = useState(null);
+  const save = (e) => {
+    e.preventDefault();
+    const f = ed;
+    if (f.price <= 0 || f.stock < 0) return t('Enter a valid price and stock');
+    f.id
+      ? set('products', (x) => x.map((p) => (p.id === f.id ? f : p)))
+      : set('products', (x) => [
+          ...x,
+          { ...f, id: Date.now(), vendorId: vid, rating: 0, approved: true },
+        ]);
+    t(f.id ? 'Product updated' : 'Product added');
+    Ed(null);
+  };
+  const u = (k) => (e) =>
+    Ed({ ...ed, [k]: e.target.type === 'number' ? +e.target.value : e.target.value });
+  return (
+    <>
+      <div className="row between">
+        <h1>Products</h1>
+        <button
+          className="btn"
+          onClick={() =>
+            Ed({
+              name: '',
+              category: categories[0],
+              desc: '',
+              price: 0,
+              unit: 'kg',
+              stock: 0,
+              min: 10,
+              active: true,
+            })
+          }
+        >
+          Add product
+        </button>
+      </div>
+      {ps.length ? (
+        <div className="tw">
+          <table>
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Category</th>
+                <th>Price</th>
+                <th>Stock</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ps.map((p) => (
+                <tr key={p.id}>
+                  <td>{p.name}</td>
+                  <td>{p.category}</td>
+                  <td>
+                    {m(p.price)}/{p.unit}
+                  </td>
+                  <td>{p.stock}</td>
+                  <td>
+                    <Badge s={p.active ? 'Active' : 'Disabled'} />
+                  </td>
+                  <td className="row">
+                    <button className="btn ghost" onClick={() => Ed(p)}>
+                      Edit
+                    </button>
+                    <button
+                      className="btn ghost"
+                      onClick={() =>
+                        set('products', (x) =>
+                          x.map((y) => (y.id === p.id ? { ...y, active: !y.active } : y))
+                        )
+                      }
+                    >
+                      {p.active ? 'Disable' : 'Enable'}
+                    </button>
+                    <button className="btn ghost" onClick={() => Del(p)}>
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <Empty t="No products yet" />
+      )}
+      {ed && (
+        <Modal title={ed.id ? 'Edit product' : 'Add product'} onClose={() => Ed(null)}>
+          <form className="form" onSubmit={save}>
+            <label>
+              Name
+              <input required value={ed.name} onChange={u('name')} />
+            </label>
+            <label>
+              Category
+              <select value={ed.category} onChange={u('category')}>
+                {categories.map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Description
+              <textarea value={ed.desc} onChange={u('desc')} />
+            </label>
+            <label>
+              Price
+              <input type="number" min="1" required value={ed.price} onChange={u('price')} />
+            </label>
+            <label>
+              Unit
+              <input required value={ed.unit} onChange={u('unit')} />
+            </label>
+            <label>
+              Stock
+              <input type="number" min="0" required value={ed.stock} onChange={u('stock')} />
+            </label>
+            <label>
+              Image
+              <input type="file" />
+            </label>
+            <label className="chk">
+              <input
+                type="checkbox"
+                checked={ed.active}
+                onChange={(e) => Ed({ ...ed, active: e.target.checked })}
+              />{' '}
+              Available
+            </label>
+            <button className="btn">Save product</button>
+          </form>
+        </Modal>
+      )}
+      {del && (
+        <Confirm
+          msg={'Delete ' + del.name + '?'}
+          onClose={() => Del(null)}
+          onYes={() => {
+            set('products', (x) => x.filter((p) => p.id !== del.id));
+            t('Product deleted successfully');
+          }}
+        />
+      )}
+    </>
+  );
+}
+const nx = {
+  Placed: 'Confirmed',
+  Confirmed: 'Preparing',
+  Preparing: 'Out for Delivery',
+  'Out for Delivery': 'Delivered',
+};
+export function VOrders() {
+  const { s, set, t } = useApp();
+  const { os } = useV();
+  const go = (o, st) => {
+    set('orders', (x) => x.map((y) => (y.id === o.id ? { ...y, status: st } : y)));
+    t('Order ' + o.id + ' marked ' + st);
+  };
+  return (
+    <>
+      <h1>Orders</h1>
+      {os.length ? (
+        <div className="tw">
+          <table>
+            <thead>
+              <tr>
+                <th>Order</th>
+                <th>Customer</th>
+                <th>Products</th>
+                <th>Amount</th>
+                <th>Date</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {os.map((o) => (
+                <tr key={o.id}>
+                  <td>{o.id}</td>
+                  <td>{s.users.find((u) => u.id === o.customerId)?.name}</td>
+                  <td>{o.items.map((i) => i.name + ' x ' + i.qty).join(', ')}</td>
+                  <td>{m(o.total)}</td>
+                  <td>{o.date}</td>
+                  <td>
+                    <Badge s={o.status} />
+                  </td>
+                  <td className="row">
+                    {nx[o.status] && (
+                      <button className="btn" onClick={() => go(o, nx[o.status])}>
+                        {o.status === 'Placed' ? 'Accept' : 'Mark ' + nx[o.status]}
+                      </button>
+                    )}
+                    {o.status === 'Placed' && (
+                      <button className="btn ghost" onClick={() => go(o, 'Rejected')}>
+                        Reject
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <Empty t="No orders yet" />
+      )}
+    </>
+  );
+}
+export function VInventory() {
+  const { set, t } = useApp();
+  const { ps } = useV();
+  return (
+    <>
+      <h1>Inventory</h1>
+      <div className="tw">
+        <table>
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>Current stock</th>
+              <th>Minimum</th>
+              <th>Status</th>
+              <th>Update</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ps.map((p) => (
+              <tr key={p.id}>
+                <td>{p.name}</td>
+                <td>
+                  <input
+                    aria-label="Stock"
+                    type="number"
+                    min="0"
+                    value={p.stock}
+                    onChange={(e) =>
+                      set('products', (x) =>
+                        x.map((y) =>
+                          y.id === p.id ? { ...y, stock: Math.max(0, +e.target.value) } : y
+                        )
+                      )
+                    }
+                  />
+                </td>
+                <td>{p.min}</td>
+                <td>
+                  <Badge
+                    s={p.stock === 0 ? 'Rejected' : p.stock <= p.min ? 'Pending' : 'Verified'}
+                  />{' '}
+                  {p.stock === 0 ? 'Out of Stock' : p.stock <= p.min ? 'Low Stock' : 'In Stock'}
+                </td>
+                <td>
+                  <button className="btn ghost" onClick={() => t('Stock saved')}>
+                    Save
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+export function VStore() {
+  const { set, t } = useApp();
+  const { v } = useV();
+  const [f, F] = useState(v);
+  const u = (k) => (e) => F({ ...f, [k]: e.target.value });
+  return (
+    <>
+      <h1>Store profile</h1>
+      <p>
+        Verification: <Badge s={v.status} />
+      </p>
+      <form
+        className="card form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          set('vendors', (x) => x.map((y) => (y.id === f.id ? f : y)));
+          t('Store updated');
+        }}
+      >
+        <label>
+          Business name
+          <input required value={f.name} onChange={u('name')} />
+        </label>
+        <label>
+          Description
+          <textarea value={f.desc} onChange={u('desc')} />
+        </label>
+        <label>
+          Address
+          <input value={f.address} onChange={u('address')} />
+        </label>
+        <label>
+          Contact
+          <input value={f.phone} onChange={u('phone')} />
+        </label>
+        <label>
+          Category
+          <select value={f.cat} onChange={u('cat')}>
+            {categories.map((c) => (
+              <option key={c}>{c}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Delivery radius (km)
+          <input type="number" min="1" value={f.radius} onChange={u('radius')} />
+        </label>
+        <label>
+          Opening hours
+          <input value={f.hours} onChange={u('hours')} />
+        </label>
+        <label>
+          Logo and cover
+          <input type="file" />
+        </label>
+        <button className="btn">Save changes</button>
+      </form>
+    </>
+  );
+}
